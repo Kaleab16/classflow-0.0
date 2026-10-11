@@ -115,7 +115,7 @@ export function LandingNavbar() {
           Sign In
         </button>
         <button
-          onClick={() => navigate('/login')}
+          onClick={() => navigate('/login?mode=signup')}
           style={{
             background: 'linear-gradient(135deg, #3B82F6 0%, #6366F1 100%)',
             border: 'none', color: '#fff', fontSize: '13.5px', fontWeight: 700,

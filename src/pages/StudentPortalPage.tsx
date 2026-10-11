@@ -4,11 +4,22 @@ import { StatusBadge } from '../components/common/StatusBadge';
 import { NewRequestModal } from '../components/requests/NewRequestModal';
 import { Plus, Megaphone, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { isSupabaseConfigured } from '../lib/supabase';
 
 export const StudentPortalPage: React.FC = () => {
-  const { requests } = useRequests();
+  const { requests, isLoading } = useRequests();
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Real details of the signed-in student (never another person's).
+  const classLine = [
+    currentUser.classSection,
+    currentUser.studentId ? `Student ID: ${currentUser.studentId}` : null
+  ]
+    .filter(Boolean)
+    .join(' • ');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -19,10 +30,10 @@ export const StudentPortalPage: React.FC = () => {
             STUDENT PORTAL
           </span>
           <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em', marginTop: '2px' }}>
-            Welcome back, Abebe Bikila
+            Welcome back, {currentUser.name}
           </h2>
           <p style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>
-            Software Engineering — Section A (Student ID: ETS/0123/15) • Class Rep: <strong>Kaleab Tesfaye</strong>
+            {classLine}
           </p>
         </div>
 
@@ -56,10 +67,15 @@ export const StudentPortalPage: React.FC = () => {
           </h3>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {isSupabaseConfigured && !isLoading && requests.length === 0 && (
+              <div style={{ backgroundColor: '#FFFFFF', border: '1px dashed #CBD5E1', borderRadius: '8px', padding: '20px', fontSize: '13px', color: '#64748B' }}>
+                No requests yet. Use "Submit Issue to Class Rep" to raise your first one.
+              </div>
+            )}
             {requests.map(req => (
               <div
                 key={req.id}
-                onClick={() => navigate(`/app/requests/${req.id}`)}
+                onClick={() => navigate(`/student/requests/${req.id}`)}
                 style={{
                   backgroundColor: '#FFFFFF',
                   border: '1px solid #E2E8F0',
@@ -94,10 +110,15 @@ export const StudentPortalPage: React.FC = () => {
         <div>
           <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Megaphone size={16} color="#2563EB" />
-            <span>Notices from Class Rep Kaleab</span>
+            <span>Class Notices</span>
           </h3>
 
           <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {isSupabaseConfigured ? (
+              <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
+                No notices yet. Announcements from your class rep will appear here.
+              </p>
+            ) : (
             <div style={{ backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '6px', padding: '12px' }}>
               <span style={{ fontSize: '11px', fontWeight: 700, color: '#1E40AF', display: 'block', marginBottom: '2px' }}>
                 POSTED BY KALEAB (SEP 24)
@@ -109,6 +130,7 @@ export const StudentPortalPage: React.FC = () => {
                 I have compiled and sent our collective query regarding group limits to Dr. Samuel Tadesse. Expecting answer tomorrow!
               </p>
             </div>
+            )}
           </div>
         </div>
       </div>

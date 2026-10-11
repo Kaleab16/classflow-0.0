@@ -5,9 +5,11 @@ import { RequestCard } from '../components/requests/RequestCard';
 import { NewRequestModal } from '../components/requests/NewRequestModal';
 import { Inbox, AlertCircle, Clock, CheckCircle2, Plus, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export const DashboardPage: React.FC = () => {
   const { requests } = useRequests();
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -32,10 +34,10 @@ export const DashboardPage: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <div>
           <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em' }}>
-            Good morning, Kaleab
+            Welcome, {currentUser.name.split(' ')[0]}
           </h2>
           <p style={{ fontSize: '14px', color: '#64748B', marginTop: '2px' }}>
-            Software Engineering — Section A • 48 Students
+            {currentUser.classSection ?? currentUser.department}
           </p>
         </div>
 

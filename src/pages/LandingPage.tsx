@@ -103,7 +103,7 @@ export function LandingPage() {
   ];
 
   const stats = [
-    { val: '3', label: 'Stakeholder Roles', suffix: '' },
+    { val: '4', label: 'Stakeholder Roles', suffix: '' },
     { val: '10', label: 'Sections per Teacher', suffix: '+' },
     { val: '0', label: 'WhatsApp Groups Needed', suffix: '' },
     { val: '100', label: 'Transparency', suffix: '%' },

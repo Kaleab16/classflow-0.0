@@ -51,11 +51,13 @@ export const Topbar: React.FC = () => {
             </span>
             {currentUser.classSection && (
               <span style={{ fontSize: '11px', color: '#3B82F6', backgroundColor: '#FFFFFF', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
-                Sec A
+                {currentUser.classSection}
               </span>
             )}
           </div>
 
+          {/* Only shown in demo mode; students never need to see infrastructure status */}
+          {!isSupabaseConfigured && (
           <div
             title={
               isSupabaseConfigured
@@ -76,8 +78,9 @@ export const Topbar: React.FC = () => {
             }}
           >
             <Database size={12} color={isSupabaseConfigured ? '#10B981' : '#94A3B8'} />
-            <span>{isSupabaseConfigured ? 'Supabase Connected' : 'Local Auth'}</span>
+            <span>Demo mode • data is not saved</span>
           </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

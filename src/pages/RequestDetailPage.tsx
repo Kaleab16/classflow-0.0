@@ -8,17 +8,41 @@ import { ActionModal } from '../components/requests/ActionModal';
 import { EditMemoModal } from '../components/requests/EditMemoModal';
 import { Users, Calendar, UserCheck, ArrowLeft, FileEdit, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { formatDate } from '../lib/time';
 
 export const RequestDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { requests } = useRequests();
+  const { requests, isLoading } = useRequests();
   const { currentUser } = useAuth();
 
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
   const [isEditMemoModalOpen, setIsEditMemoModalOpen] = useState(false);
 
-  const request = requests.find(r => r.id === id) || requests[0]; // fallback to first item
+  const request = requests.find(r => r.id === id);
+
+  // Never show a different request just because this one was not found
+  // (it may be removed, or this user may not be allowed to see it).
+  if (!request) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
+        <div>
+          <button
+            onClick={() => navigate(-1)}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', fontSize: '13px', fontWeight: 600, color: '#64748B', cursor: 'pointer', padding: 0 }}
+          >
+            <ArrowLeft size={16} />
+            <span>Back</span>
+          </button>
+        </div>
+        <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '24px', color: '#475569', fontSize: '14px' }}>
+          {isLoading
+            ? 'Loading request...'
+            : 'Request not found. It may have been removed, or you may not have access to it.'}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
@@ -135,7 +159,7 @@ export const RequestDetailPage: React.FC = () => {
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', fontWeight: 600, color: '#0F172A' }}>
               <Calendar size={16} color="#64748B" />
-              <span>{request.submittedAt}</span>
+              <span>{formatDate(request.submittedAt)}</span>
             </div>
           </div>
         </div>
@@ -180,7 +204,7 @@ export const RequestDetailPage: React.FC = () => {
           <div style={{ backgroundColor: '#DCFCE7', border: '1px solid #86EFAC', borderRadius: '8px', padding: '16px', marginBottom: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 800, color: '#15803D', textTransform: 'uppercase', marginBottom: '6px' }}>
               <CheckCircle2 size={16} />
-              <span>OFFICIAL RESOLUTION ({request.resolutionDate})</span>
+              <span>OFFICIAL RESOLUTION ({formatDate(request.resolutionDate)})</span>
             </div>
             <p style={{ fontSize: '14px', color: '#14532D', fontWeight: 600 }}>
               "{request.resolutionText}"

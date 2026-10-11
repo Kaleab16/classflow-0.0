@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ActivityEvent, StakeholderStep } from '../../types/request';
 import { CheckCircle2, Clock, Circle } from 'lucide-react';
+import { formatWhen } from '../../lib/time';
 
 interface Props {
   stakeholderSteps: StakeholderStep[];
@@ -68,7 +69,7 @@ export const Timeline: React.FC<Props> = ({ stakeholderSteps, activity }) => {
 
                     {step.timestamp && (
                       <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 500 }}>
-                        {step.timestamp}
+                        {formatWhen(step.timestamp)}
                       </span>
                     )}
                   </div>
@@ -115,7 +116,7 @@ export const Timeline: React.FC<Props> = ({ stakeholderSteps, activity }) => {
                   <span style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
                     {event.actorName}
                   </span>
-                  <span style={{ fontSize: '11px', color: '#94A3B8' }}>{event.timestamp}</span>
+                  <span style={{ fontSize: '11px', color: '#94A3B8' }}>{formatWhen(event.timestamp)}</span>
                 </div>
                 <p style={{ fontSize: '13px', color: '#334155' }}>{event.action}</p>
                 {event.details && (

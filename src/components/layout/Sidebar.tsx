@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   LayoutDashboard,
@@ -19,9 +19,36 @@ import {
   Settings
 } from 'lucide-react';
 import { getRoleBasePath } from '../common/ProtectedRoute';
+import { isSupabaseConfigured } from '../../lib/supabase';
+
+// Pages that still show prototype/sample data. They are hidden from the menu when
+// the app runs against a real backend, so students never see fake numbers.
+const PROTOTYPE_PATHS = new Set([
+  '/student/meetings',
+  '/student/notifications',
+  '/class-rep/tickets',
+  '/class-rep/communication',
+  '/class-rep/class',
+  '/class-rep/notifications',
+  '/teacher/meetings',
+  '/teacher/communication',
+  '/teacher/notifications',
+  '/admin/dashboard',
+  '/admin/classes',
+  '/admin/representatives',
+  '/admin/teachers',
+  '/admin/reports',
+  '/admin/settings'
+]);
 
 export const Sidebar: React.FC = () => {
   const { currentUser, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
+  };
 
   const getNavItems = () => {
     switch (currentUser.role) {
@@ -69,7 +96,9 @@ export const Sidebar: React.FC = () => {
     }
   };
 
-  const navItems = getNavItems();
+  const navItems = getNavItems().filter(
+    (item) => !isSupabaseConfigured || !PROTOTYPE_PATHS.has(item.path)
+  );
   const roleBasePath = getRoleBasePath(currentUser.role);
 
   return (
@@ -191,7 +220,7 @@ export const Sidebar: React.FC = () => {
         </NavLink>
 
         <button
-          onClick={logout}
+          onClick={handleLogout}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -208,7 +237,7 @@ export const Sidebar: React.FC = () => {
           }}
         >
           <LogOut size={14} />
-          <span>Exit Session</span>
+          <span>Sign out</span>
         </button>
       </div>
     </aside>

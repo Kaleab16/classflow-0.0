@@ -6,6 +6,7 @@ import { Users, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getRoleBasePath } from '../common/ProtectedRoute';
+import { formatWhen } from '../../lib/time';
 
 interface Props {
   request: ClassRequest;
@@ -70,7 +71,7 @@ export const RequestRow: React.FC<Props> = ({ request }) => {
       </td>
 
       <td style={{ padding: '14px 16px', fontSize: '12px', color: '#64748B' }}>
-        {request.lastUpdatedAt}
+        {formatWhen(request.lastUpdatedAt)}
       </td>
 
       <td style={{ padding: '14px 16px', textAlign: 'right' }}>

@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type { ClassRequest } from '../types/request';
 import { INITIAL_REQUESTS } from '../data/mockData';
 
+// Shape of a row in public.requests (see supabase/schema.sql).
 export interface RequestDbRow {
   id: string;
   title: string;
@@ -9,8 +10,6 @@ export interface RequestDbRow {
   priority: ClassRequest['priority'];
   status: ClassRequest['status'];
   students_affected: number;
-  submitted_at: string;
-  last_updated_at: string;
   student_description: string;
   rep_memo: string;
   rep_memo_status: ClassRequest['repMemoStatus'];
@@ -20,27 +19,47 @@ export interface RequestDbRow {
   resolution_date?: string | null;
   activity: ClassRequest['activity'];
   stakeholder_steps: ClassRequest['stakeholderSteps'];
+  created_by?: string | null;
+  created_by_name?: string | null;
+  created_at: string;
+  updated_at?: string | null;
 }
 
-export function toDbRow(req: ClassRequest): RequestDbRow {
+// A request that has not been saved yet: the database assigns the id, the
+// author and the timestamps.
+export type NewRequestDraft = Omit<ClassRequest, 'id'>;
+
+// Columns a student may send when creating a request. The database overwrites
+// author, status and timestamps no matter what is sent here.
+function toInsertRow(draft: NewRequestDraft) {
   return {
-    id: req.id,
-    title: req.title,
-    category: req.category,
-    priority: req.priority,
+    title: draft.title,
+    category: draft.category,
+    priority: draft.priority,
+    status: draft.status,
+    students_affected: draft.studentsAffected,
+    student_description: draft.studentDescription,
+    rep_memo: draft.repMemo,
+    rep_memo_status: draft.repMemoStatus,
+    instructor: draft.instructor,
+    waiting_on: draft.waitingOn ?? null,
+    activity: draft.activity,
+    stakeholder_steps: draft.stakeholderSteps
+  };
+}
+
+// Columns that change when staff work on a request. Title, description,
+// author and dates are never rewritten.
+function toUpdateRow(req: ClassRequest) {
+  return {
     status: req.status,
-    students_affected: req.studentsAffected,
-    submitted_at: req.submittedAt,
-    last_updated_at: req.lastUpdatedAt,
-    student_description: req.studentDescription,
     rep_memo: req.repMemo,
     rep_memo_status: req.repMemoStatus,
-    instructor: req.instructor,
     waiting_on: req.waitingOn ?? null,
     resolution_text: req.resolutionText ?? null,
     resolution_date: req.resolutionDate ?? null,
     activity: req.activity,
-    stakeholder_steps: req.stakeholderSteps,
+    stakeholder_steps: req.stakeholderSteps
   };
 }
 
@@ -52,8 +71,9 @@ export function fromDbRow(row: RequestDbRow): ClassRequest {
     priority: row.priority,
     status: row.status,
     studentsAffected: row.students_affected,
-    submittedAt: row.submitted_at,
-    lastUpdatedAt: row.last_updated_at,
+    // ISO timestamps; the UI formats them with lib/time.ts when displaying.
+    submittedAt: row.created_at,
+    lastUpdatedAt: row.updated_at ?? row.created_at,
     studentDescription: row.student_description,
     repMemo: row.rep_memo,
     repMemoStatus: row.rep_memo_status,
@@ -63,65 +83,60 @@ export function fromDbRow(row: RequestDbRow): ClassRequest {
     resolutionDate: row.resolution_date ?? undefined,
     activity: Array.isArray(row.activity) ? row.activity : [],
     stakeholderSteps: Array.isArray(row.stakeholder_steps) ? row.stakeholder_steps : [],
+    createdBy: row.created_by ?? undefined,
+    createdByName: row.created_by_name ?? undefined
   };
 }
 
+// All methods throw on failure. Nothing silently falls back to demo data when a
+// backend is configured, so a failed save is never shown as a success.
 export const requestsService = {
   async fetchRequests(): Promise<ClassRequest[]> {
     if (!isSupabaseConfigured) {
       return INITIAL_REQUESTS;
     }
 
-    try {
-      const { data, error } = await supabase
-        .from('requests')
-        .select('*')
-        .order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('requests')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('[Supabase] Failed to fetch requests:', error.message);
-        return INITIAL_REQUESTS;
-      }
-
-      if (!data || data.length === 0) {
-        // Seed initial requests into Supabase if empty
-        await this.seedInitialRequests();
-        return INITIAL_REQUESTS;
-      }
-
-      return data.map((row: any) => fromDbRow(row as RequestDbRow));
-    } catch (err) {
-      console.error('[Supabase] Unexpected error fetching requests:', err);
-      return INITIAL_REQUESTS;
+    if (error) {
+      throw new Error(error.message);
     }
+
+    return (data ?? []).map((row: RequestDbRow) => fromDbRow(row));
   },
 
-  async seedInitialRequests(): Promise<void> {
-    if (!isSupabaseConfigured) return;
-    try {
-      const rows = INITIAL_REQUESTS.map(toDbRow);
-      const { error } = await supabase.from('requests').insert(rows);
-      if (error) {
-        console.warn('[Supabase] Could not seed initial mock data:', error.message);
-      } else {
-        console.info('[Supabase] Initial requests successfully seeded to database.');
-      }
-    } catch (err) {
-      console.warn('[Supabase] Seed error:', err);
+  async createRequest(draft: NewRequestDraft): Promise<ClassRequest> {
+    const { data, error } = await supabase
+      .from('requests')
+      .insert(toInsertRow(draft))
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
     }
+
+    return fromDbRow(data as RequestDbRow);
   },
 
-  async upsertRequest(req: ClassRequest): Promise<void> {
+  async updateRequest(req: ClassRequest): Promise<void> {
     if (!isSupabaseConfigured) return;
 
-    try {
-      const row = toDbRow(req);
-      const { error } = await supabase.from('requests').upsert(row, { onConflict: 'id' });
-      if (error) {
-        console.error('[Supabase] Failed to save request:', error.message);
-      }
-    } catch (err) {
-      console.error('[Supabase] Upsert error:', err);
+    const { data, error } = await supabase
+      .from('requests')
+      .update(toUpdateRow(req))
+      .eq('id', req.id)
+      .select('id');
+
+    if (error) {
+      throw new Error(error.message);
+    }
+    // A row-level-security block returns no error and no rows.
+    if (!data || data.length === 0) {
+      throw new Error('You do not have permission to change this request.');
     }
   }
 };

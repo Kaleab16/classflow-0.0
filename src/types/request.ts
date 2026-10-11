@@ -45,4 +45,7 @@ export interface ClassRequest {
   resolutionDate?: string;
   activity: ActivityEvent[];
   stakeholderSteps: StakeholderStep[];
+  /** Account id of the person who submitted the request (set by the database). */
+  createdBy?: string;
+  createdByName?: string;
 }

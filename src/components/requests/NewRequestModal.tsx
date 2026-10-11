@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Modal } from '../common/Modal';
 import { useRequests } from '../../context/RequestsContext';
 import type { Category, Priority } from '../../types/request';
+import { INSTRUCTORS } from '../../config';
 
 interface Props {
   isOpen: boolean;
@@ -15,13 +16,27 @@ export const NewRequestModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const [priority, setPriority] = useState<Priority>('medium');
   const [studentsAffected, setStudentsAffected] = useState(1);
   const [description, setDescription] = useState('');
-  const [instructor, setInstructor] = useState('Dr. Samuel Tadesse');
+  const [instructor, setInstructor] = useState(INSTRUCTORS[0] ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !description.trim()) return;
+    if (!title.trim() || !description.trim() || saving) return;
 
-    addRequest(title, category, priority, studentsAffected, description, instructor);
+    setError(null);
+    setSaving(true);
+    const result = await addRequest(title, category, priority, studentsAffected, description, instructor);
+    setSaving(false);
+
+    // Only close (and clear the form) when the database really saved it.
+    if (!result.ok) {
+      setError(result.error ?? 'Your request was not saved. Please try again.');
+      return;
+    }
+    setTitle('');
+    setDescription('');
+    setStudentsAffected(1);
     onClose();
   };
 
@@ -100,10 +115,9 @@ export const NewRequestModal: React.FC<Props> = ({ isOpen, onClose }) => {
               onChange={e => setInstructor(e.target.value)}
               style={{ width: '100%', padding: '8px 12px', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '13px' }}
             >
-              <option value="Dr. Samuel Tadesse">Dr. Samuel Tadesse</option>
-              <option value="Dr. Meron Kebede">Dr. Meron Kebede</option>
-              <option value="Abel Getachew">Abel Getachew</option>
-              <option value="Department Registrar">Department Registrar</option>
+              {INSTRUCTORS.map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
             </select>
           </div>
         </div>
@@ -122,6 +136,12 @@ export const NewRequestModal: React.FC<Props> = ({ isOpen, onClose }) => {
           />
         </div>
 
+        {error && (
+          <div role="alert" style={{ backgroundColor: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: '6px', padding: '10px 12px', fontSize: '12px', color: '#991B1B' }}>
+            {error}
+          </div>
+        )}
+
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
           <button
             type="button"
@@ -132,9 +152,10 @@ export const NewRequestModal: React.FC<Props> = ({ isOpen, onClose }) => {
           </button>
           <button
             type="submit"
-            style={{ padding: '8px 18px', borderRadius: '6px', border: 'none', backgroundColor: '#2563EB', fontSize: '13px', color: '#FFFFFF', fontWeight: 600 }}
+            disabled={saving}
+            style={{ padding: '8px 18px', borderRadius: '6px', border: 'none', backgroundColor: '#2563EB', fontSize: '13px', color: '#FFFFFF', fontWeight: 600, opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}
           >
-            Save Request
+            {saving ? 'Saving...' : 'Save Request'}
           </button>
         </div>
       </form>

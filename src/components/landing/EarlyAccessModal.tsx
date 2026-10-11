@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal } from '../common/Modal';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 
 interface EarlyAccessModalProps {
   isOpen: boolean;
@@ -9,16 +10,41 @@ interface EarlyAccessModalProps {
 export function EarlyAccessModal({ isOpen, onClose }: EarlyAccessModalProps) {
   const [form, setForm] = useState({ name: '', email: '', role: '', university: '' });
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (form.name && form.email && form.role) {
-      setSubmitted(true);
+    if (!form.name.trim() || !form.email.trim() || !form.role) return;
+    setError(null);
+
+    // Never claim "you're on the list" unless it was really saved.
+    if (!isSupabaseConfigured) {
+      setError('The waitlist is not connected in this demo version.');
+      return;
     }
+
+    setLoading(true);
+    // No .select() here: visitors can add themselves but can never read the list.
+    const { error: insertError } = await supabase.from('waitlist').insert({
+      name: form.name.trim(),
+      email: form.email.trim().toLowerCase(),
+      role: form.role,
+      university: form.university.trim() || null
+    });
+    setLoading(false);
+
+    // 23505 = this email is already on the list, which is fine for the visitor.
+    if (insertError && insertError.code !== '23505') {
+      setError('Something went wrong. Please try again in a moment.');
+      return;
+    }
+    setSubmitted(true);
   };
 
   const handleClose = () => {
     setSubmitted(false);
+    setError(null);
     setForm({ name: '', email: '', role: '', university: '' });
     onClose();
   };
@@ -137,8 +163,14 @@ export function EarlyAccessModal({ isOpen, onClose }: EarlyAccessModalProps) {
             onBlur={(e) => (e.target.style.borderColor = 'rgba(255,255,255,0.12)')}
           />
         </div>
+        {error && (
+          <div role="alert" style={{ color: '#FCA5A5', fontSize: '13px' }}>
+            {error}
+          </div>
+        )}
         <button
           type="submit"
+          disabled={loading}
           style={{
             marginTop: '8px',
             background: 'linear-gradient(135deg, #3B82F6, #06B6D4)',
@@ -150,7 +182,7 @@ export function EarlyAccessModal({ isOpen, onClose }: EarlyAccessModalProps) {
           onMouseEnter={(e) => ((e.target as HTMLButtonElement).style.transform = 'scale(1.02)')}
           onMouseLeave={(e) => ((e.target as HTMLButtonElement).style.transform = 'scale(1)')}
         >
-          Request Early Access
+          {loading ? 'Sending...' : 'Request Early Access'}
         </button>
       </form>
     </Modal>

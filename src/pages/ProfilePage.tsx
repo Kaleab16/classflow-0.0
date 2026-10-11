@@ -4,6 +4,7 @@ import type { UserRole } from '../context/AuthContext';
 import { ContributionGraph } from '../components/profile/ContributionGraph';
 import { MetricCard } from '../components/common/MetricCard';
 import { Mail, Building, GraduationCap, CheckCircle2, FileText, Award, Activity } from 'lucide-react';
+import { isSupabaseConfigured } from '../lib/supabase';
 
 export const ProfilePage: React.FC = () => {
   const { currentUser, setRole } = useAuth();
@@ -106,6 +107,10 @@ export const ProfilePage: React.FC = () => {
         </div>
       </div>
 
+      {/* Sample statistics and the demo role switcher exist only in demo mode.
+          With a real backend they would show made-up numbers / do nothing. */}
+      {!isSupabaseConfigured && (
+      <>
       {/* Operational Overview Metrics */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
         <MetricCard title="Total Memos Compiled" value={28} icon={FileText} accentColor="#2563EB" />
@@ -159,6 +164,8 @@ export const ProfilePage: React.FC = () => {
           })}
         </div>
       </div>
+      </>
+      )}
 
       {/* Role Permissions Matrix */}
       <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px' }}>

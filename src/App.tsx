@@ -1,8 +1,10 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { RequestsProvider } from './context/RequestsContext';
 import { AppLayout } from './components/layout/AppLayout';
 import { ProtectedRoute, getRoleBasePath } from './components/common/ProtectedRoute';
+import { FullPageMessage } from './components/common/FullPageMessage';
+import { isSupabaseConfigured } from './lib/supabase';
 
 // Core Pages
 import { LandingPage } from './pages/LandingPage';
@@ -34,11 +36,23 @@ import {
 
 import './styles/tokens.css';
 
-// Helper component to redirect legacy /app or fallback routes to user's role workspace
+// Redirects legacy /app/... links and unknown URLs to the user's own workspace.
+// Anything after /app is kept, so /app/requests/REQ-1001 becomes
+// /student/requests/REQ-1001 (or /class-rep/..., etc.).
 function RoleRedirect() {
-  const { currentUser } = useAuth();
-  const targetPath = getRoleBasePath(currentUser.role);
-  return <Navigate to={targetPath} replace />;
+  const { currentUser, isAuthenticated, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return <FullPageMessage>Loading ClassFlow...</FullPageMessage>;
+  }
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  const base = getRoleBasePath(currentUser.role);
+  const rest = location.pathname.startsWith('/app') ? location.pathname.slice('/app'.length) : '';
+  return <Navigate to={`${base}${rest}`} replace />;
 }
 
 function AppRoutes() {
@@ -115,7 +129,11 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="/admin/dashboard" replace />} />
+        {/* With a real backend, the admin's home is the user approvals screen */}
+        <Route
+          index
+          element={<Navigate to={isSupabaseConfigured ? '/admin/users' : '/admin/dashboard'} replace />}
+        />
         <Route path="dashboard" element={<AdminPortalPage />} />
         <Route path="requests/:id" element={<RequestDetailPage />} />
         <Route path="users" element={<AdminUsersView />} />
