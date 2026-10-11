@@ -1,18 +1,31 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim() ?? '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() ?? '';
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+export const isSupabaseConfigured = Boolean(
+  supabaseUrl &&
+  supabaseAnonKey &&
+  /^https?:\/\//i.test(supabaseUrl),
+);
+
+export const backendMode = isSupabaseConfigured ? 'live' : 'demo';
 
 if (!isSupabaseConfigured) {
   console.warn(
-    '[ClassFlow] Supabase environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) are not set. Using local mock/fallback mode.'
+    '[ClassFlow] Running in DEMO mode. Configure VITE_SUPABASE_URL and ' +
+    'VITE_SUPABASE_ANON_KEY for real authentication and persistent data.',
   );
 }
 
-// Create a Supabase client (or a dummy client if keys are not yet configured)
 export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-anon-key'
+  isSupabaseConfigured ? supabaseUrl : 'https://placeholder.supabase.co',
+  isSupabaseConfigured ? supabaseAnonKey : 'demo-placeholder-key',
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  },
 );

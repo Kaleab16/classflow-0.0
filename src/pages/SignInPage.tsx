@@ -97,7 +97,7 @@ export const SignInPage: React.FC = () => {
     setInfo(null);
 
     if (!isSupabaseConfigured) {
-      setError('This demo is not connected to a backend, so signing in is disabled.');
+      setError('Demo mode is active. Configure the Supabase environment variables to enable real sign-in and account creation.');
       return;
     }
 

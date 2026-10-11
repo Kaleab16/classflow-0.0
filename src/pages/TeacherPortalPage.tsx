@@ -1,188 +1,195 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Calendar, CheckCircle2, FileEdit, Layers, RefreshCw } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { useRequests } from '../context/RequestsContext';
-import { MOCK_TEACHER_SECTIONS } from '../data/mockData';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ActionModal } from '../components/requests/ActionModal';
 import { TeacherAnalyticsView } from '../components/teacher/TeacherAnalyticsView';
-import { FileEdit, CheckCircle2, Calendar, Layers } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import type { RequestStatus } from '../types/request';
+
+type StatusFilter = 'all' | RequestStatus;
+
+const panel: React.CSSProperties = {
+  background: '#FFFFFF',
+  border: '1px solid #E2E8F0',
+  borderRadius: 12,
+  padding: 20,
+  minWidth: 0
+};
 
 export const TeacherPortalPage: React.FC = () => {
-  const { requests } = useRequests();
+  const { currentUser } = useAuth();
+  const { requests, isLoading, actionError, clearActionError, refreshRequests } = useRequests();
   const navigate = useNavigate();
-  const [selectedSectionId, setSelectedSectionId] = useState<string>(MOCK_TEACHER_SECTIONS[0].id);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [selectedReqId, setSelectedReqId] = useState<string | null>(null);
 
-  const activeSection = MOCK_TEACHER_SECTIONS.find(s => s.id === selectedSectionId) || MOCK_TEACHER_SECTIONS[0];
+  // RLS controls which records reach this page. The current schema has no
+  // teacher_id/course_id relationship, so do not invent section assignments.
+  const visibleRequests = useMemo(() => {
+    const sorted = [...requests].sort(
+      (a, b) => new Date(b.lastUpdatedAt).getTime() - new Date(a.lastUpdatedAt).getTime()
+    );
+    return statusFilter === 'all'
+      ? sorted
+      : sorted.filter((request) => request.status === statusFilter);
+  }, [requests, statusFilter]);
 
-  // Filter requests targeting Dr. Samuel Tadesse
-  const teacherRequests = requests.filter(r => r.instructor.includes('Samuel') || r.status === 'waiting_for_response');
+  const openCount = requests.filter(
+    (request) => request.status !== 'resolved' && request.status !== 'closed'
+  ).length;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* Teacher Header */}
-      <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '24px' }}>
-        <span style={{ fontSize: '12px', fontWeight: 700, color: '#16A34A', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          INSTRUCTOR MULTI-CLASS DASHBOARD
-        </span>
-        <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em', marginTop: '2px' }}>
-          Dr. Samuel Tadesse
-        </h2>
-        <p style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>
-          Senior Lecturer — Overseeing 5 Course Sections & Assigned Class Representatives
-        </p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0 }}>
+      <section style={{ ...panel, padding: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <span style={{ fontSize: 12, fontWeight: 800, color: '#2563EB', letterSpacing: '0.06em' }}>
+              TEACHER WORKSPACE
+            </span>
+            <h2 style={{ fontSize: 25, fontWeight: 800, color: '#0F172A', margin: '6px 0 4px', overflowWrap: 'anywhere' }}>
+              Welcome, {currentUser.name}
+            </h2>
+            <p style={{ fontSize: 13, lineHeight: 1.6, color: '#64748B', margin: 0 }}>
+              Review requests returned by your account's database permissions and record decisions.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void refreshRequests()}
+            disabled={isLoading}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: '1px solid #CBD5E1', borderRadius: 8, padding: '9px 12px', background: '#FFFFFF', color: '#334155', cursor: isLoading ? 'wait' : 'pointer', fontWeight: 700 }}
+          >
+            <RefreshCw size={15} />
+            {isLoading ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
+      </section>
+
+      {actionError && (
+        <div role="alert" style={{ ...panel, borderColor: '#FCA5A5', background: '#FEF2F2', color: '#991B1B' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+            <span>{actionError}</span>
+            <button type="button" onClick={clearActionError} aria-label="Dismiss error" style={{ border: 0, background: 'transparent', color: 'inherit', cursor: 'pointer' }}>Dismiss</button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ ...panel, background: '#FFFBEB', borderColor: '#FDE68A', color: '#92400E', fontSize: 13, lineHeight: 1.6 }}>
+        <strong>Assignment configuration needed:</strong> requests currently contain an instructor text field, not a secure teacher account or course-section assignment. This inbox displays records allowed by Supabase RLS. Before a multi-teacher rollout, add a teacher assignment relationship and enforce it in database policies.
       </div>
 
-      {/* Multi-Class Section Tabs (1 Teacher -> Many Class Reps & Sections) */}
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-          <Layers size={16} color="#2563EB" />
-          <h3 style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Select Course Section ({MOCK_TEACHER_SECTIONS.length} Sections Managed)
-          </h3>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '12px' }}>
-          {MOCK_TEACHER_SECTIONS.map(section => {
-            const isSelected = section.id === activeSection.id;
-            return (
-              <button
-                key={section.id}
-                onClick={() => setSelectedSectionId(section.id)}
-                style={{
-                  padding: '14px',
-                  borderRadius: '10px',
-                  border: `2px solid ${isSelected ? '#2563EB' : '#E2E8F0'}`,
-                  backgroundColor: isSelected ? '#EFF6FF' : '#FFFFFF',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  boxShadow: isSelected ? '0 4px 6px -1px rgba(37, 99, 235, 0.1)' : '0 1px 2px rgba(0,0,0,0.02)',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <div style={{ fontSize: '11px', fontWeight: 700, color: isSelected ? '#2563EB' : '#64748B' }}>
-                  {section.courseCode}
-                </div>
-                <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginTop: '2px' }}>
-                  {section.sectionName.split('—')[1] || section.sectionName}
-                </div>
-                <div style={{ fontSize: '12px', color: '#475569', marginTop: '6px', borderTop: '1px solid #F1F5F9', paddingTop: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>Rep: <strong>{section.classRepName.split(' ')[0]}</strong></span>
-                  <span style={{ fontSize: '11px', backgroundColor: isSelected ? '#DBEAFE' : '#F1F5F9', color: '#1E40AF', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
-                    {section.pendingRequests} Pending
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Layers size={17} color="#2563EB" />
+        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          Request overview
+        </h3>
       </div>
 
-      {/* Analytical View for Selected Class Section */}
-      <TeacherAnalyticsView section={activeSection} />
+      <TeacherAnalyticsView requests={requests} />
 
-      {/* Forwarded Memos Queue */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '24px' }}>
-        <div>
-          <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <FileEdit size={16} color="#2563EB" />
-            <span>Memos Forwarded by {activeSection.classRepName} ({teacherRequests.length})</span>
-          </h3>
+      <section style={panel}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+          <div>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, margin: 0, color: '#0F172A' }}>
+              <FileEdit size={17} color="#2563EB" /> Request inbox
+            </h3>
+            <p style={{ margin: '5px 0 0', fontSize: 12, color: '#64748B' }}>
+              {requests.length} records available to this account · {openCount} open
+            </p>
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#475569', fontSize: 13 }}>
+            Status
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+              style={{ maxWidth: '100%', border: '1px solid #CBD5E1', borderRadius: 7, padding: '8px 10px', background: '#FFFFFF', color: '#0F172A' }}
+            >
+              <option value="all">All statuses</option>
+              <option value="new">New</option>
+              <option value="in_progress">In progress</option>
+              <option value="waiting_for_response">Waiting for response</option>
+              <option value="resolved">Resolved</option>
+              <option value="closed">Closed</option>
+            </select>
+          </label>
+        </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {teacherRequests.map(req => (
-              <div
-                key={req.id}
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '10px',
-                  padding: '20px',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <StatusBadge status={req.status} />
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#2563EB', backgroundColor: '#EFF6FF', padding: '2px 8px', borderRadius: '4px' }}>
-                    {req.studentsAffected} Students Affected
+        {isLoading ? (
+          <p role="status" style={{ color: '#64748B', fontSize: 13 }}>Loading requests…</p>
+        ) : visibleRequests.length === 0 ? (
+          <div style={{ border: '1px dashed #CBD5E1', borderRadius: 8, padding: 24, textAlign: 'center' }}>
+            <p style={{ margin: '0 0 6px', fontWeight: 700, color: '#334155' }}>No requests to display</p>
+            <p style={{ margin: 0, color: '#64748B', fontSize: 13 }}>
+              {requests.length === 0 ? 'No requests were returned by the database. Check the signed-in account and Supabase policies.' : 'Try another status filter.'}
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {visibleRequests.map((request) => (
+              <article key={request.id} style={{ border: '1px solid #E2E8F0', borderRadius: 9, padding: 16, minWidth: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+                  <StatusBadge status={request.status} />
+                  <span style={{ fontSize: 12, color: '#64748B' }}>
+                    {request.category} · {request.studentsAffected} affected
                   </span>
                 </div>
-
-                <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', marginBottom: '8px' }}>
-                  {req.title}
+                <h4 style={{ margin: '0 0 7px', fontSize: 16, lineHeight: 1.4, color: '#0F172A', overflowWrap: 'anywhere' }}>
+                  {request.title}
                 </h4>
-
-                {/* Rep Formatted Memo */}
-                <div style={{ backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '6px', padding: '12px', marginBottom: '14px', fontSize: '13px', color: '#1E3A8A' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#2563EB', textTransform: 'uppercase', marginBottom: '4px' }}>
-                    FORMATTED MEMO FROM {activeSection.classRepName.toUpperCase()} (CLASS REP)
+                <p style={{ margin: '0 0 10px', fontSize: 13, lineHeight: 1.6, color: '#475569', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                  {request.studentDescription}
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 12, color: '#64748B', marginBottom: 12 }}>
+                  <span>Instructor field: {request.instructor || 'Not specified'}</span>
+                  <span>·</span>
+                  <span>Waiting on: {request.waitingOn || 'Not specified'}</span>
+                </div>
+                {request.repMemo.trim() && (
+                  <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 7, padding: 12, marginBottom: 12 }}>
+                    <p style={{ margin: '0 0 5px', fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Representative memo</p>
+                    <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: '#334155', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{request.repMemo}</p>
                   </div>
-                  "{req.repMemo}"
-                </div>
-
-                {/* Actions */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #F1F5F9', paddingTop: '12px' }}>
-                  <button
-                    onClick={() => navigate(`/app/requests/${req.id}`)}
-                    style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', background: 'none', border: 'none', cursor: 'pointer' }}
-                  >
-                    View Timeline
+                )}
+                {request.resolutionText && (
+                  <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 7, padding: 12, marginBottom: 12, color: '#166534', fontSize: 13 }}>
+                    <strong>Resolution:</strong> {request.resolutionText}
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap', borderTop: '1px solid #F1F5F9', paddingTop: 12 }}>
+                  <button type="button" onClick={() => navigate(`/teacher/requests/${request.id}`)} style={{ border: 0, background: 'transparent', color: '#475569', fontWeight: 700, cursor: 'pointer', padding: '7px 0' }}>
+                    View timeline
                   </button>
-
                   <button
-                    onClick={() => setSelectedReqId(req.id)}
-                    style={{
-                      backgroundColor: '#16A34A',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      borderRadius: '6px',
-                      padding: '8px 14px',
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      cursor: 'pointer'
-                    }}
+                    type="button"
+                    onClick={() => setSelectedReqId(request.id)}
+                    style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, border: 0, borderRadius: 7, padding: '9px 12px', background: '#166534', color: '#FFFFFF', fontWeight: 700, cursor: 'pointer' }}
                   >
-                    <CheckCircle2 size={15} />
-                    <span>Issue Decision / Resolution</span>
+                    <CheckCircle2 size={15} /> Review / issue decision
                   </button>
                 </div>
-              </div>
+              </article>
             ))}
           </div>
-        </div>
+        )}
+      </section>
 
-        {/* Consultation Appointments */}
-        <div>
-          <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Calendar size={16} color="#2563EB" />
-            <span>Consultation Appointments</span>
-          </h3>
-
-          <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '6px', padding: '12px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: '#2563EB', marginBottom: '2px' }}>
-                TOMORROW — 10:30 AM
-              </div>
-              <h5 style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', marginBottom: '2px' }}>
-                Meeting with {activeSection.classRepName} ({activeSection.sectionName.split('—')[1] || 'Sec A'})
-              </h5>
-              <p style={{ fontSize: '12px', color: '#64748B' }}>
-                Office 304, Block B • Purpose: Assignment #2 Clarification
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <section style={{ ...panel, background: '#F8FAFC' }}>
+        <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, color: '#0F172A', margin: '0 0 7px' }}>
+          <Calendar size={16} color="#64748B" /> Consultations
+        </h3>
+        <p style={{ margin: 0, color: '#64748B', fontSize: 13, lineHeight: 1.6 }}>
+          Meeting scheduling is not connected to a database table yet. No appointments are shown because there are no persisted meeting records to display.
+        </p>
+      </section>
 
       {selectedReqId && (
         <ActionModal
-          isOpen={!!selectedReqId}
+          isOpen={Boolean(selectedReqId)}
           onClose={() => setSelectedReqId(null)}
           requestId={selectedReqId}
-          currentStatus="waiting_for_response"
+          currentStatus={requests.find((request) => request.id === selectedReqId)?.status ?? 'new'}
         />
       )}
     </div>
